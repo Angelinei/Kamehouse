@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Kamehameha Scream Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #2c3e50;
+            color: white;
+            padding-top: 50px;
+        }
+        #power-bar-container {
+            width: 80%;
+            height: 30px;
+            background-color: #34495e;
+            margin: 20px auto;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        #power-bar {
+            width: 0%;
+            height: 100%;
+            background-color: #3498db; /* Blue Kamehameha color */
+            transition: width 0.05s ease-out;
+            box-shadow: 0 0 10px #3498db;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Kamehameha Scream Power Test</h1>
+    <p id="status">Press START to allow microphone access and begin charging.</p>
+    <p id="volume-output">Current Volume: 0</p>
+    
+    <div id="power-bar-container">
+        <div id="power-bar"></div>
+    </div>
+
+    <button onclick="startMicTest()">START CHARGING</button>
+
+    <script>
+        // *** JAVASCRIPT: THE VIBE CODE FOR MIC INPUT ***
+        const maxChargeTime = 5000; // Test for 5 seconds
+        let isCharging = false;
+        
+        function startMicTest() {
+            if (isCharging) return;
+            isCharging = true;
+            document.getElementById('status').innerText = "SCREAM NOW! (Test running for 5 seconds)";
+
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const analyser = audioContext.createAnalyser();
+                    const source = audioContext.createMediaStreamSource(stream);
+                    source.connect(analyser);
+                    
+                    // Set up analysis parameters
+                    analyser.fftSize = 256;
+                    const bufferLength = analyser.frequencyBinCount;
+                    const dataArray = new Uint8Array(bufferLength);
+
+                    let maxPowerLevel = 0;
+                    const startTime = Date.now();
+
+                    function updateVolume() {
+                        analyser.getByteTimeDomainData(dataArray);
+                        
+                        // Calculate maximum amplitude (loudness)
+                        let maxAmplitude = 0;
+                        for(let i = 0; i < bufferLength; i++) {
+                            // Amplitude is 0-255, centered at 128
+                            const amplitude = Math.abs(dataArray[i] - 128); 
+                            if (amplitude > maxAmplitude) {
+                                maxAmplitude = amplitude;
+                            }
+                        }
+                        
+                        // Scale the amplitude (max 128) to a power level (max 100)
+                        const powerScore = Math.min(100, Math.round((maxAmplitude / 128) * 100));
+
+                        // Update visuals and max score
+                        maxPowerLevel = Math.max(maxPowerLevel, powerScore);
+                        document.getElementById('volume-output').innerText = `Current Volume: ${powerScore} (Max: ${maxPowerLevel})`;
+                        document.getElementById('power-bar').style.width = `${maxPowerLevel}%`;
+
+                        // Check timer
+                        if (Date.now() - startTime < maxChargeTime) {
+                            requestAnimationFrame(updateVolume);
+                        } else {
+                            // End Test
+                            stream.getTracks().forEach(track => track.stop());
+                            audioContext.close();
+                            isCharging = false;
+                            document.getElementById('status').innerText = `TEST COMPLETE! Final Power Score: ${maxPowerLevel} / 100`;
+                        }
+                    }
+
+                    updateVolume(); // Start the loop
+                })
+                .catch(error => {
+                    document.getElementById('status').innerText = "Error: Microphone access denied or not available. Please ensure your browser allows mic access over a secure connection (HTTPS).";
+                    isCharging = false;
+                    console.error("Microphone error:", error);
+                });
+        }
+    </script>
+</body>
+</html>

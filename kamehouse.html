@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Kamehameha Scream Power Test</title>
+    <style>
+        /* CSS Styling: The Visual Vibe */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            background-color: #2c3e50; /* Dark background */
+            color: white;
+            padding-top: 50px;
+        }
+        #power-bar-container {
+            width: 80%;
+            height: 40px;
+            background-color: #34495e;
+            margin: 20px auto;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+        #power-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #3498db, #2ecc71, #f1c40f); /* Blue to Green to Gold power gradient */
+            transition: width 0.05s ease-out;
+            box-shadow: 0 0 15px #3498db;
+        }
+        button {
+            padding: 12px 25px;
+            font-size: 20px;
+            font-weight: bold;
+            background-color: #e74c3c; /* Red Start Button */
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #c0392b;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Kamehameha Scream Power Test</h1>
+    <p id="status">Press START to allow microphone access and begin charging.</p>
+    <p id="volume-output">Current Volume: 0 (Max: 0)</p>
+    
+    <div id="power-bar-container">
+        <div id="power-bar"></div>
+    </div>
+
+    <button onclick="startMicTest()">START CHARGING</button>
+    <p style="font-size: 0.8em; margin-top: 40px;">*Note: Your browser may require a secure connection (HTTPS) for microphone access.</p>
+
+    <script>
+        // *** JAVASCRIPT: THE CORE LOGIC FOR MICROPHONE ANALYSIS ***
+        const maxChargeTime = 8000; // Test for 8 seconds
+        let isCharging = false;
+        
+        function startMicTest() {
+            if (isCharging) return;
+            isCharging = true;
+            document.getElementById('status').innerText = "KAMEHAMEHA! SCREAM NOW! (Test running for 8 seconds)";
+
+            // 1. Get Microphone Stream
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const analyser = audioContext.createAnalyser();
+                    const source = audioContext.createMediaStreamSource(stream);
+                    source.connect(analyser);
+                    
+                    // Setup analysis parameters for quick volume check
+                    analyser.fftSize = 256;
+                    const bufferLength = analyser.frequencyBinCount;
+                    const dataArray = new Uint8Array(bufferLength); // Raw audio data array
+
+                    let maxPowerLevel = 0;
+                    const startTime = Date.now();
+
+                    function updateVolume() {
+                        analyser.getByteTimeDomainData(dataArray); // Get raw waveform data
+                        
+                        // 2. Calculate Maximum Amplitude (Loudness)
+                        let maxAmplitude = 0;
+                        for(let i = 0; i < bufferLength; i++) {
+                            // Raw data is 0-255, center is 128. Amplitude is the distance from 128.
+                            const amplitude = Math.abs(dataArray[i] - 128); 
+                            if (amplitude > maxAmplitude) {
+                                maxAmplitude = amplitude;
+                            }
+                        }
+                        
+                        // 3. Scale Amplitude (Max 128) to Power Score (Max 100)
+                        const powerScore = Math.min(100, Math.round((maxAmplitude / 128) * 100));
+
+                        // 4. Update Visuals and Track Max Score
+                        maxPowerLevel = Math.max(maxPowerLevel, powerScore);
+                        document.getElementById('volume-output').innerText = `Current Volume: ${powerScore} (Max: ${maxPowerLevel})`;
+                        document.getElementById('power-bar').style.width = `${maxPowerLevel}%`;
+
+                        // 5. Check Timer and Loop
+                        if (Date.now() - startTime < maxChargeTime) {
+                            requestAnimationFrame(updateVolume); // Keep running the test
+                        } else {
+                            // End Test
+                            stream.getTracks().forEach(track => track.stop()); // Stop mic access
+                            audioContext.close();
+                            isCharging = false;
+                            document.getElementById('status').innerText = `TEST COMPLETE! FINAL POWER LEVEL: ${maxPowerLevel} / 100.`;
+                        }
+                    }
+
+                    updateVolume(); // Start the test loop
+                })
+                .catch(error => {
+                    document.getElementById('status').innerText = "ERROR: Microphone access denied or not available. Cannot start charging!";
+                    isCharging = false;
+                    console.error("Microphone error:", error);
+                });
+        }
+    </script>
+</body>
+</html>
